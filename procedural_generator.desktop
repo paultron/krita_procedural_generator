@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=Krita/PythonPlugin
+X-KDE-Library=procedural_generator
+X-Python-2-Compatible=false
+X-Krita-Manual=Manual.html
+Name=Procedural Generation
+Comment=Procedural Generator based on alpha values.
