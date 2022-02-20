@@ -1,4 +1,4 @@
-from krita import Krita, DockWidget, QWidget, QCheckBox, QLabel, QPushButton, QSpinBox, QVBoxLayout
+from krita import Krita, DockWidget, QWidget, QCheckBox, QGroupBox, QFrame, QGridLayout, QLabel, QPushButton, QSpinBox, QHBoxLayout, QVBoxLayout
 from PyQt5.QtCore import pyqtSlot
 import random
 
@@ -15,44 +15,48 @@ class ProceduralGenerator(DockWidget):
 
         self.setWidget(mainWidget)
 
-        buttonGenerateSingle = QPushButton("Generate This Layer!", mainWidget)
+        buttonGenerateSingle = QPushButton("Generate This Layer!")
         buttonGenerateSingle.clicked.connect(self.generateThisLayer)
 
-        buttonGenerateAll = QPushButton("Generate All!", mainWidget)
+        buttonGenerateAll = QPushButton("Generate All!")
         buttonGenerateAll.clicked.connect(self.generateAllLayers)
 
-        buttonDrawOutline = QPushButton("Draw Outline", mainWidget)
-        buttonDrawOutline.clicked.connect(lambda x: self.drawOutline(
-            Krita.instance().activeDocument().activeNode()))
+        buttonDrawOutline = QPushButton("Draw Outline")
+        buttonDrawOutline.clicked.connect(self.drawOutlineThisLayer)
 
-        # self.checkLayersAll = QCheckBox("All Layers", mainWidget)
-        self.checkMirrorX = QCheckBox("Mirror X Generation", mainWidget)
-        self.checkMirrorY = QCheckBox("Mirror Y Generation", mainWidget)
-        self.checkStrayPixels = QCheckBox("Remove Stray Pixels", mainWidget)
+        self.checkMirrorX = QCheckBox("Mirror X Generation")
+        self.checkMirrorY = QCheckBox("Mirror Y Generation")
+        self.checkStrayPixels = QCheckBox("Remove Stray Pixels")
         self.checkOutlineCorners = QCheckBox(
-            "Outline Extra Corners", mainWidget)
+            "Outline Extra Corners")
         self.checkOutlineGenerate = QCheckBox(
-            "Generate with fg outline", mainWidget)
-        labelVariations = QLabel("Number of variations:", mainWidget)
+            "Generate with foreground outline")
+        labelVariations = QLabel("Number of variations:")
         self.spinVariations = QSpinBox(mainWidget)
         self.spinVariations.setMinimum(1)
 
-        mainWidget.setLayout(QVBoxLayout())
-        mainWidget.layout().addWidget(buttonGenerateSingle)
-        mainWidget.layout().addWidget(buttonGenerateAll)
-        mainWidget.layout().addWidget(buttonDrawOutline)
+        mainLayout = QGridLayout()
+        mainLayout.addWidget(buttonGenerateSingle, 0, 0)
+        mainLayout.addWidget(buttonGenerateAll, 0, 1)
 
-        # mainWidget.layout().addWidget(self.checkLayersAll)
-        mainWidget.layout().addWidget(self.checkMirrorX)
-        mainWidget.layout().addWidget(self.checkMirrorY)
-        mainWidget.layout().addWidget(self.checkStrayPixels)
-        mainWidget.layout().addWidget(self.checkOutlineGenerate)
-        mainWidget.layout().addWidget(self.checkOutlineCorners)
-        mainWidget.layout().addWidget(labelVariations)
-        mainWidget.layout().addWidget(self.spinVariations)
+        mainLayout.addWidget(buttonDrawOutline, 1, 0, 1, 2)
 
-    # notifies when views are added or removed
-    # 'pass' means do not do anything
+        mainLayout.addWidget(self.checkMirrorX, 2, 0)
+        mainLayout.addWidget(self.checkMirrorY, 2, 1)
+
+        frameSeparate = QFrame()
+        frameSeparate.setFrameShape(4)
+        mainLayout.addWidget(frameSeparate, 3, 0, 1, 2)
+
+        mainLayout.addWidget(self.checkStrayPixels, 4, 0, 1, 2)
+        mainLayout.addWidget(self.checkOutlineGenerate, 5, 0, 1, 2)
+        mainLayout.addWidget(self.checkOutlineCorners, 6, 0, 1, 2)
+
+        mainLayout.addWidget(labelVariations, 7, 0)
+        mainLayout.addWidget(self.spinVariations, 7, 1)
+
+        mainWidget.setLayout(mainLayout)
+
     def canvasChanged(self, canvas):
         pass
 
@@ -66,8 +70,6 @@ class ProceduralGenerator(DockWidget):
 
         # byte array for active layer
         pixelBytes = aNode.pixelData(
-            0, 0, width, height)
-        newPixelBytes = newNode.pixelData(
             0, 0, width, height)
 
         # loop through each pixel
@@ -88,16 +90,10 @@ class ProceduralGenerator(DockWidget):
             oldAlpha = int.from_bytes(
                 pixelBytes[pix+3], 'little')
 
-            tempPixel = [int.from_bytes(newPixelBytes[pix + 0], 'little'),
-                         int.from_bytes(newPixelBytes[pix + 1], 'little'),
-                         int.from_bytes(newPixelBytes[pix + 2], 'little')]
-
             # roll the chance that the pixel gets generated
             chance = int(random.random() * 256)
 
             newAlpha = 255 if (oldAlpha == 255 or chance < oldAlpha) else 0
-
-            # if (chance <= oldAlpha) and (oldAlpha > 0):
 
             #newAlpha = 255
             if newAlpha == 255:
@@ -160,58 +156,22 @@ class ProceduralGenerator(DockWidget):
                         newNode.setPixelData(
                             bytearray([xyPixel[0], xyPixel[1], xyPixel[2], newAlpha]), (pXY/4) % width, y+(width/2-y)*2-1-cp, 1, 1)
 
-        if self.checkStrayPixels.isChecked():
-
-            pixelBytes = newNode.pixelData(
-                0, 0, width+2, height+2)
-
-            for pix in range(0, len(pixelBytes), 4):
-                # print(pixelBytes[pix+3])
-                thisPixel = [int.from_bytes(pixelBytes[pix + 0], 'little'),
-                             int.from_bytes(pixelBytes[pix + 1], 'little'),
-                             int.from_bytes(pixelBytes[pix + 2], 'little')]
-
-                x = int(pix/4 % (width+2))
-                y = int(pix/4 / (width+2))
-
-                l = pix - 4
-                r = pix + 4
-                u = pix - 4 * (width + 2)
-                ul = pix - 4 * (width + 2) - 4
-                ur = pix - 4 * (width + 2) + 4
-                d = pix + 4 * (width + 2)
-                dl = pix + 4 * (width + 2) - 4
-                dr = pix + 4 * (width + 2) + 4
-                # print(f"{pix}: x{x} y{y}")
-                if x <= width and y <= height:
-                    if (pixelBytes[l+3] == b'\x00' and
-                            pixelBytes[r+3] == b'\x00' and
-                            pixelBytes[u+3] == b'\x00' and
-                            pixelBytes[ul+3] == b'\x00' and
-                            pixelBytes[ur+3] == b'\x00' and
-                            pixelBytes[d+3] == b'\x00' and
-                            pixelBytes[dl+3] == b'\x00' and
-                            pixelBytes[dr+3] == b'\x00'):
-                        # erase
-                        newNode.setPixelData(
-                            bytearray([thisPixel[0], thisPixel[1], thisPixel[2], 0]), x, y, 1, 1)
-
-        if self.checkOutlineGenerate.isChecked():
-            self.drawOutline(newNode)
-
-        # self.activeDoc.refreshProjection()
-
     def generateThisLayer(self):
         self.activeDoc = Krita.instance().activeDocument()
-        root = self.activeDoc.rootNode()
         aNode = self.activeDoc.activeNode()
-        if not aNode.locked():
+        if (aNode.visible() and not aNode.locked() and
+                len(aNode.pixelData(0, 0, self.activeDoc.width(), self.activeDoc.height())) > 0):
+            root = self.activeDoc.rootNode()
             _groupLayer = self.activeDoc.createNode("Output(s)", "groupLayer")
             root.addChildNode(_groupLayer, None)
             for v in range(self.spinVariations.value()):
                 layerName = "Variation " + str(v + 1)
                 _newLayer = self.activeDoc.createNode(layerName, "paintLayer")
                 self.generateLayer(aNode, _newLayer)
+                if self.checkStrayPixels.isChecked():
+                    self.removeStrayPixels(_newLayer)
+                if self.checkOutlineGenerate.isChecked():
+                    self.drawOutline(_newLayer)
                 _groupLayer.addChildNode(_newLayer, None)
                 _newLayer.setLocked(True)
                 # self.activeDoc.refreshProjection()
@@ -221,7 +181,8 @@ class ProceduralGenerator(DockWidget):
     def generateAllLayers(self):
         self.activeDoc = Krita.instance().activeDocument()
         root = self.activeDoc.rootNode()
-
+        _groupLayer = self.activeDoc.createNode("Output(s)", "groupLayer")
+        root.addChildNode(_groupLayer, None)
         for v in range(self.spinVariations.value()):
             layerName = "Variation " + str(v + 1)
             _newLayer = self.activeDoc.createNode(layerName, "paintLayer")
@@ -245,18 +206,61 @@ class ProceduralGenerator(DockWidget):
                                 self.activeDoc.setActiveNode(child)
                                 self.activeNode = self.activeDoc.activeNode()
                                 self.generateLayer(self.activeNode, _newLayer)
-
-            root.addChildNode(_newLayer, None)
+            if self.checkStrayPixels.isChecked():
+                self.removeStrayPixels(_newLayer)
+            if self.checkOutlineGenerate.isChecked():
+                self.drawOutline(_newLayer)
+            _groupLayer.addChildNode(_newLayer, None)
             _newLayer.setLocked(True)
-
+        _groupLayer.setLocked(True)
         self.activeDoc.refreshProjection()  # update canvas on screen
+
+    def removeStrayPixels(self, aNode):
+
+        self.activeDoc = Krita.instance().activeDocument()
+
+        width = self.activeDoc.width()
+        height = self.activeDoc.height()
+
+        pixelBytes = aNode.pixelData(
+            0, 0, width+2, height+2)
+
+        for pix in range(0, len(pixelBytes), 4):
+            # print(pixelBytes[pix+3])
+            thisPixel = [int.from_bytes(pixelBytes[pix + 0], 'little'),
+                         int.from_bytes(pixelBytes[pix + 1], 'little'),
+                         int.from_bytes(pixelBytes[pix + 2], 'little')]
+
+            x = int(pix/4 % (width+2))
+            y = int(pix/4 / (width+2))
+
+            l = pix - 4
+            r = pix + 4
+            u = pix - 4 * (width + 2)
+            ul = pix - 4 * (width + 2) - 4
+            ur = pix - 4 * (width + 2) + 4
+            d = pix + 4 * (width + 2)
+            dl = pix + 4 * (width + 2) - 4
+            dr = pix + 4 * (width + 2) + 4
+            # print(f"{pix}: x{x} y{y}")
+            if x <= width and y <= height:
+                if (pixelBytes[l+3] == b'\x00' and
+                    pixelBytes[r+3] == b'\x00' and
+                    pixelBytes[u+3] == b'\x00' and
+                    pixelBytes[ul+3] == b'\x00' and
+                    pixelBytes[ur+3] == b'\x00' and
+                    pixelBytes[d+3] == b'\x00' and
+                    pixelBytes[dl+3] == b'\x00' and
+                        pixelBytes[dr+3] == b'\x00'):
+                    # erase
+                    aNode.setPixelData(
+                        bytearray([thisPixel[0], thisPixel[1], thisPixel[2], 0]), x, y, 1, 1)
 
     def drawOutline(self, aNode):
         if not aNode.locked():
             self.activeDoc = Krita.instance().activeDocument()
 
             aView = Krita.instance().activeWindow().activeView()
-            # aNode = activeDoc.activeNode()
 
             fg = aView.foregroundColor().colorForCanvas(aView.canvas())
             fgBytes = bytearray([fg.blue(), fg.green(), fg.red()])
@@ -296,4 +300,16 @@ class ProceduralGenerator(DockWidget):
                             (pixelBytes[dr:dr+3] != fgBytes and pixelBytes[dr+3] != b'\x00' and self.checkOutlineCorners.isChecked())):
                         aNode.setPixelData(
                             bytearray([fg.blue(), fg.green(), fg.red(), 255]), x, y, 1, 1)
-            self.activeDoc.refreshProjection()
+
+    def drawOutlineThisLayer(self):
+        self.activeDoc = Krita.instance().activeDocument()
+        aNode = self.activeDoc.activeNode()
+        if (aNode.visible() and not aNode.locked() and
+                len(aNode.pixelData(0, 0, self.activeDoc.width(), self.activeDoc.height())) > 0):
+            root = Krita.instance().activeDocument().rootNode()
+            _newLayer = aNode.clone()
+            self.drawOutline(_newLayer)
+            _newLayer.setName(aNode.name() + " Outlined")
+            root.addChildNode(_newLayer, None)
+
+            Krita.instance().activeDocument().refreshProjection()
